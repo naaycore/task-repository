@@ -120,6 +120,10 @@ public class Scheduler {
             Duration period,
             Runnable runnable
     ) {
+        if (!accepting.get()) {
+            throw new RejectedExecutionException(
+                    "Scheduler cannot accept tasks");
+        }
         long id = ids.incrementAndGet();
 
         return scheduleInternal(
@@ -179,8 +183,7 @@ public class Scheduler {
                     runAt,
                     periodicNano,
                     periodMode,
-                    cancels.get(id),
-                    false
+                    cancels.get(id)
             );
         } else {
             task = new Task(id, runnable, runAt, cancels.get(id));
@@ -215,17 +218,17 @@ public class Scheduler {
 
     private void workerLoop() {
         while (true) {
-            if (stopping.get()) {
-                if (readyQueue.isEmpty()) {
-                    return;
-                }
+            if (stopping.get() && readyQueue.isEmpty()) {
+                return;
             }
 
-            if (readyQueue.isEmpty()) {
-                continue;
+            Task task;
+            try {
+                task = readyQueue.poll(100, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
             }
-
-            Task task = readyQueue.poll();
 
             if (task == null) {
                 continue;
@@ -248,11 +251,6 @@ public class Scheduler {
                 continue;
             }
 
-            if (periodicTask.isPeriodicCancelled()) {
-                cleanupTask(periodicTask);
-                continue;
-            }
-
             long nextRunAt;
 
             if (periodicTask.getPeriodMode() == PeriodMode.FIXED_RATE) {
@@ -268,10 +266,6 @@ public class Scheduler {
     }
 
     private void requeueTask(Task task) {
-        if (task instanceof PeriodicTask && ((PeriodicTask) task).isPeriodicCancelled()) {
-            cleanupTask(task);
-            return;
-        }
         if (task.getCancelled().get()) {
             cleanupTask(task);
             return;
@@ -339,9 +333,6 @@ public class Scheduler {
                 .get() || !accepting.get()) {
             cancels.remove(task.getId());
             return;
-        }
-        if ((((PeriodicTask) task).isPeriodicCancelled())) {
-            cancels.remove(task.getId());
         }
     }
 

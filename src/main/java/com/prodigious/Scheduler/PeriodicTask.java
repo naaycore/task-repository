@@ -9,7 +9,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class PeriodicTask extends Task {
     private final long periodNano;
     private final PeriodMode periodMode;
-    private boolean periodicCancelled;
 
     public PeriodicTask(
             long id,
@@ -17,14 +16,12 @@ public class PeriodicTask extends Task {
             long runAt,
             long periodNano,
             PeriodMode periodMode,
-            AtomicBoolean cancelled,
-            boolean periodicCancelled
+            AtomicBoolean cancelled
     ) {
         super(id, runnable, runAt, cancelled);
 
         this.periodNano = periodNano;
         this.periodMode = periodMode;
-        this.periodicCancelled = periodicCancelled;
     }
 
 }
